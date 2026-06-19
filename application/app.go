@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -32,8 +33,22 @@ func (a *App) Start(ctx context.Context) error {
 
 	fmt.Println("Starting Server...")
 
-	if err := server.ListenAndServe(); err != nil {
-		return fmt.Errorf("faild to start http server: %w", err)
+	ch := make(chan error, 1)
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			ch <- fmt.Errorf("faild to start http server: %w", err)
+		}
+		close(ch)
+	}()
+
+	select {
+	case err := <-ch:
+		return err
+	case <-ctx.Done():
+		timeout, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		return server.Shutdown(timeout)
 	}
 
 	return nil
