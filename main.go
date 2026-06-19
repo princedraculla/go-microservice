@@ -13,7 +13,7 @@ func main() {
 
 	err := app.Start(context.TODO())
 	if err != nil {
-		fmt.Println("faild to start the server...!")
+		fmt.Println("faild to start the server...! \n", err)
 	}
 
 }
