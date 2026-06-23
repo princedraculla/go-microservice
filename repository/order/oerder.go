@@ -1,4 +1,4 @@
-package order
+package repo
 
 import (
 	"context"
@@ -22,19 +22,21 @@ func (r *RedisRepo) Insert(ctx context.Context, order model.Order) error {
 	if err != nil {
 		return fmt.Errorf("faild to encode order: %w", err)
 	}
-
 	key := OrderIDKey(order.OrderID)
+	fmt.Println("order_id in repository: ", key)
 
 	txn := r.Client.TxPipeline()
 
-	res := txn.HSetNX(ctx, key, string(data), 0)
+	fmt.Println("string of data in repository : ", string(data))
+
+	res := txn.SetNX(ctx, key, string(data), 0)
 
 	if err := res.Err(); err != nil {
 		txn.Discard()
 		return fmt.Errorf("faild to insert: %w", err)
 	}
 
-	if err = txn.SAdd(ctx, key, "orders").Err(); err != nil {
+	if err = txn.SAdd(ctx, "orders", key).Err(); err != nil {
 		txn.Discard()
 		return fmt.Errorf("faild to add to orders set: %w", err)
 	}
@@ -170,5 +172,5 @@ type FindAllPage struct {
 }
 
 func OrderIDKey(id uint64) string {
-	return fmt.Sprintf("order:%d", id)
+	return fmt.Sprintf("orders:%d", id)
 }
