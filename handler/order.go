@@ -57,7 +57,21 @@ func (o *Order) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Order) List(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("listing all orders")
+	data, err := o.Repo.FindAll(r.Context(), repo.FindAllPage{
+		Size:   10,
+		Offset: 15,
+	})
+
+	if err != nil {
+		err := fmt.Sprintf("somthing not right... %w", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err))
+	}
+
+	w.WriteHeader(http.StatusOK)
+	response := fmt.Sprintf("orders: %v, and the cursor right now, %v", data.Orders, data.Cursor)
+	w.Write([]byte(response))
+
 }
 
 func (o *Order) GetByID(w http.ResponseWriter, r *http.Request) {
