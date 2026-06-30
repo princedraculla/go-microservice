@@ -168,7 +168,7 @@ func (r *RedisRepo) FindAll(ctx context.Context, page FindAllPage) (FindResult, 
 
 type FindAllPage struct {
 	Size   uint
-	Offset uint
+	Offset uint64
 }
 
 func OrderIDKey(id uint64) string {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,20 +58,48 @@ func (o *Order) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Order) List(w http.ResponseWriter, r *http.Request) {
-	data, err := o.Repo.FindAll(r.Context(), repo.FindAllPage{
-		Size:   10,
-		Offset: 15,
+	cursorStr := r.URL.Query().Get("cursor")
+
+	if cursorStr == "" {
+		cursorStr = "0"
+	}
+
+	const decimal = 10
+	const bitSize = 64
+	cursor, err := strconv.ParseUint(cursorStr, decimal, bitSize)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	const size = 50
+
+	res, err := o.Repo.FindAll(r.Context(), repo.FindAllPage{
+		Size:   size,
+		Offset: cursor,
 	})
 
 	if err != nil {
-		err := fmt.Sprintf("somthing not right... %w", err)
+		fmt.Println("fialed to find all: ", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err))
+		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	response := fmt.Sprintf("orders: %v, and the cursor right now, %v", data.Orders, data.Cursor)
-	w.Write([]byte(response))
+	var response struct {
+		Items []model.Order `json:"items"`
+		Next  uint64        `json:"next,omitempty"`
+	}
+
+	response.Items = res.Orders
+	response.Next = res.Cursor
+
+	data, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
 
 }
 
