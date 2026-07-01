@@ -106,8 +106,6 @@ func (o *Order) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Order) GetByID(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Get one Order By ID")
-
 	orderIDStr := chi.URLParam(r, "id")
 
 	if orderIDStr == "" {
@@ -139,7 +137,69 @@ func (o *Order) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("update one Order by ID")
+
+	var body struct {
+		Status string `json:"status"`
+	}
+
+	orderIdSrt := chi.URLParam(r, "id")
+
+	const base = 10
+	const bitSize = 64
+	orderID, err := strconv.ParseUint(orderIdSrt, base, bitSize)
+	if err != nil {
+		fmt.Println("failed to convert id to uint:", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		fmt.Println("failed to unmarshal the body:", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	theOrder, err := o.Repo.FindByID(r.Context(), orderID)
+	if errors.Is(err, repo.ErrNotExist) {
+		fmt.Println(repo.ErrNotExist)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	const completedStatus = "completed"
+	const shippedStatus = "shipped"
+	now := time.Now().UTC()
+	switch body.Status {
+	case shippedStatus:
+		if theOrder.ShippedAt != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		theOrder.ShippedAt = &now
+	case completedStatus:
+		if theOrder.CompeletedAt != nil || theOrder.ShippedAt != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		theOrder.CompeletedAt = &now
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = o.Repo.Update(r.Context(), theOrder)
+	if err != nil {
+		fmt.Println("failed to update order:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(theOrder); err != nil {
+		fmt.Println("failed to marshal:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 }
 
 func (o *Order) DeleteByID(w http.ResponseWriter, r *http.Request) {
